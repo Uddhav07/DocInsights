@@ -1,23 +1,39 @@
 import streamlit as st
+import os
+# from langchain_core.runnables import RunnablePassthrough
+# from langchain_core.messages import HumanMessage
+from langchain.document_loaders import UnstructuredFileLoader
+# from langchain.document_loaders.image import UnstructuredImageLoader
+from langchain.document_loaders import ImageCaptionLoader
+from langchain.chains.combine_documents import create_stuff_documents_chain
+# from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 # import pandas as pd
 # from io import StringIO
+from langchain.chains import ConversationalRetrievalChain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms import Ollama
 import PyPDF2
 from langchain_community.embeddings import HuggingFaceEmbeddings
 embeddings = HuggingFaceEmbeddings()
+# from langchain_community.embeddings import OllamaEmbeddings
+# embeddings = OllamaEmbeddings()
 from langchain_community.vectorstores import FAISS
 # from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
+text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
-prompt=ChatPromptTemplate.from_messages(
-    [
-        ("system","Help the user understand things better"),
-        ("user","Question:{question}")
-    ]
-)
+
+prompt = ChatPromptTemplate.from_template("""
+Answer the following question based only on the provided context. 
+Think step by step before providing a detailed answer. 
+I will tip you $1000 if the user finds the answer helpful. 
+<context>
+{context}
+</context>
+Question: {input}""")
+
 st.title("DocInsight")
 
 # Initialize chat history
@@ -29,64 +45,90 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-def extract_text_from_pdf(pdf_file):
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in range(len(pdf_reader.pages)):
-        text += pdf_reader.pages[page].extract_text()
-    return text
 
 llm=Ollama(model="phi3")
 output_parser=StrOutputParser()
-chain=prompt|llm|output_parser
+# chain=prompt|llm|output_parser
 
-db=0
-# React to user input
-if prompt := st.chat_input("Yooo wassup?"):
-    if db:
-        retireved_results=db.similarity_search(prompt)
-        print(retireved_results[0].page_content)
-    
-    # Display user message in chat message container
-    st.chat_message("user").markdown(prompt)
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
 
-    response = chain.invoke({"question":prompt})
-    # Display assistant response in chat message container
-    with st.chat_message("assistant"):
-        st.markdown(response)
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": response})
+document_chain=create_stuff_documents_chain(llm,prompt)
+
+from langchain.chains import create_retrieval_chain
+
     
 with st.sidebar:
     uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
-from langchain.docstore.document import Document
-# if uploaded_files is not :
-if 0:
-    # # Extract text from the PDF
-    # pdf_file = BytesIO(uploaded_file.read())
-    # pdf_text = extract_text_from_pdf(uploaded_file)
-    
-    # # Display the extracted text
-    # # st.write("PDF Text:")
-    # # st.write(pdf_text)
-    # broken_pdf=text_splitter.split_documents(pdf_text)
-    
-    # Create a file-like object from the uploaded file
-    pdf_file = BytesIO(uploaded_file.read())
+      
+if uploaded_files:
+    # Print the number of files uploaded or YouTube URL provided to the console
+    st.write(f"Number of files uploaded: {len(uploaded_files)}")
+        # Load the data and perform preprocessing only if it hasn't been loaded before
+    if "processed_data" not in st.session_state:
+        # Load the data from uploaded files
+        documents = []
 
-    # Extract text from the PDF
-    pdf_text = extract_text_from_pdf(pdf_file)
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                # Get the full file path of the uploaded file
+                file_path = os.path.join(os.getcwd(), uploaded_file.name)
 
-    doc = Document(page_content=pdf_text)
+                # Save the uploaded file to disk
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getvalue())
 
-    # Split the document
-    broken_pdf = text_splitter.split_documents([doc])
-    
-    # Extract the page_content from each Document object
-    texts = [doc.page_content for doc in broken_pdf]
+                # Check if the file is an image
+                if file_path.endswith((".png", ".jpg")):
+                    # Use ImageCaptionLoader to load the image file
+                    image_loader = ImageCaptionLoader(path_images=[file_path])
 
-    # Embed the texts
-    vec_pdf = embeddings.embed_documents(texts)
-    db = FAISS.from_documents(vec_pdf, embeddings)
+                    # Load image captions
+                    image_documents = image_loader.load()
+
+                    # Append the Langchain documents to the documents list
+                    documents.extend(image_documents)
+                    
+                elif file_path.endswith((".pdf", ".docx", ".txt")):
+                    # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
+                    loader = UnstructuredFileLoader(file_path)
+                    loaded_documents = loader.load()
+
+                    # Extend the main documents list with the loaded documents
+                    documents.extend(loaded_documents)
+
+        # Chunk the data, create embeddings, and save in vectorstore
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+        document_chunks = text_splitter.split_documents(documents)
+
+        vectorstore = FAISS.from_documents(document_chunks, embeddings)
+
+        # Store the processed data in session state for reuse
+        st.session_state.processed_data = {
+            "document_chunks": document_chunks,
+            "vectorstore": vectorstore,
+        }
+
+    else:
+        # If the processed data is already available, retrieve it from session state
+        document_chunks = st.session_state.processed_data["document_chunks"]
+        vectorstore = st.session_state.processed_data["vectorstore"]
+        
+        
+    if prompt := st.chat_input("Yooo wassup?"):
+        
+        # Display user message in chat message container
+        st.chat_message("user").markdown(prompt)
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # docs = db.similarity_search(prompt)
+        
+        retriever=vectorstore.as_retriever()
+        retrieval_chain=create_retrieval_chain(retriever,document_chain)
+        response=retrieval_chain.invoke({"input":prompt})
+        
+        
+        # Display assistant response in chat message container
+        with st.chat_message("assistant"):
+            st.markdown(response["answer"])
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
