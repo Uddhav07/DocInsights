@@ -2,3 +2,5 @@ ollama
 streamlit
 langchain_community
 langchain_core
+faiss-cpu
+pypdf2

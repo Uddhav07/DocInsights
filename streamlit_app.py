@@ -1,10 +1,17 @@
 import streamlit as st
 # import pandas as pd
-# from io import StringIO
+from io import StringIO
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms import Ollama
+import PyPDF2
+
+from langchain_community.document_loaders import PyPDFLoader
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
+
 
 
 prompt=ChatPromptTemplate.from_messages(
@@ -25,6 +32,12 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+def extract_text_from_pdf(pdf_file):
+    pdf_reader = PyPDF2.PdfReader(pdf_file)
+    text = ""
+    for page in range(len(pdf_reader.pages)):
+        text += pdf_reader.pages[page].extract_text()
+    return text
 
 llm=Ollama(model="phi3")
 output_parser=StrOutputParser()
@@ -45,4 +58,11 @@ if prompt := st.chat_input("Yooo wassup?"):
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
     
-# uploaded_file = st.file_uploader("Choose a file", accept_multiple_files=1)
+uploaded_file = st.file_uploader("Choose a file",type=["pdf"])
+if uploaded_file is not None:
+    # Extract text from the PDF
+    pdf_text = extract_text_from_pdf(uploaded_file)
+    
+    # Display the extracted text
+    # st.write("PDF Text:")
+    # st.write(pdf_text)
