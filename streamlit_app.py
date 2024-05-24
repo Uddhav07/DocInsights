@@ -18,13 +18,17 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 
 prompt = ChatPromptTemplate.from_template("""
-Prefferably Answer the following question based only on the provided context. 
-Think step by step before providing a detailed answer using chain of verification (COVE)
+Prefferably Answer the following question based  on the provided context. 
+Only If much reference is not available in the context then start the answer with [NotDoc] and answer on your own
+answer in very short very fast
 I will tip you $1000 if the user finds the answer helpful. 
 <context>
 {context}
 </context>
 Question: {input}""")
+
+#Think step by step before providing a detailed answer using chain of verification (COVE)
+
 
 st.title("DocInsight")
 
@@ -38,54 +42,56 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 
-llm=Ollama(model="phi3")
+llm=Ollama(model="qwen:0.5b")
 output_parser=StrOutputParser()
 # chain=prompt|llm|output_parser
 
 
 document_chain=create_stuff_documents_chain(llm,prompt)
 
+with st.sidebar:
+    uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
+prompt = st.chat_input("Yooo wassup?")
 
 
     
-with st.sidebar:
-    uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
-      
-if uploaded_files:
-    # Print the number of files uploaded or YouTube URL provided to the console
-    st.write(f"Number of files uploaded: {len(uploaded_files)}")
-        # Load the data and perform preprocessing only if it hasn't been loaded before
-    if "processed_data" not in st.session_state:
+def uploaded():
+    if uploaded_files:
+        global vectorstore
+        # Print the number of files uploaded or YouTube URL provided to the console
+        st.write(f"Number of files uploaded: {len(uploaded_files)}")
+            # Load the data and perform preprocessing only if it hasn't been loaded before
+        
         # Load the data from uploaded files
         documents = []
 
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                # Get the full file path of the uploaded file
-                file_path = os.path.join(os.getcwd(), uploaded_file.name)
+        
+        for uploaded_file in uploaded_files:
+            # Get the full file path of the uploaded file
+            file_path = os.path.join(os.getcwd(), uploaded_file.name)
 
-                # Save the uploaded file to disk
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getvalue())
+            # Save the uploaded file to disk
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
 
-                # Check if the file is an image
-                if file_path.endswith((".png", ".jpg")):
-                    # Use ImageCaptionLoader to load the image file
-                    image_loader = ImageCaptionLoader(path_images=[file_path])
+            # Check if the file is an image
+            if file_path.endswith((".png", ".jpg")):
+                # Use ImageCaptionLoader to load the image file
+                image_loader = ImageCaptionLoader(path_images=[file_path])
 
-                    # Load image captions
-                    image_documents = image_loader.load()
+                # Load image captions
+                image_documents = image_loader.load()
 
-                    # Append the Langchain documents to the documents list
-                    documents.extend(image_documents)
-                    
-                elif file_path.endswith((".pdf", ".docx", ".txt")):
-                    # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
-                    loader = UnstructuredFileLoader(file_path)
-                    loaded_documents = loader.load()
+                # Append the Langchain documents to the documents list
+                documents.extend(image_documents)
+                
+            elif file_path.endswith((".pdf", ".docx", ".txt")):
+                # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
+                loader = UnstructuredFileLoader(file_path)
+                loaded_documents = loader.load()
 
-                    # Extend the main documents list with the loaded documents
-                    documents.extend(loaded_documents)
+                # Extend the main documents list with the loaded documents
+                documents.extend(loaded_documents)
 
         # Chunk the data, create embeddings, and save in vectorstore
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
@@ -98,14 +104,9 @@ if uploaded_files:
             "document_chunks": document_chunks,
             "vectorstore": vectorstore,
         }
-
-    else:
-        # If the processed data is already available, retrieve it from session state
-        document_chunks = st.session_state.processed_data["document_chunks"]
-        vectorstore = st.session_state.processed_data["vectorstore"]
-        
-        
-    if prompt := st.chat_input("Yooo wassup?"):
+            
+def prompted():        
+    if prompt:
         
         # Display user message in chat message container
         st.chat_message("user").markdown(prompt)
@@ -118,9 +119,15 @@ if uploaded_files:
         retrieval_chain=create_retrieval_chain(retriever,document_chain)
         response=retrieval_chain.invoke({"input":prompt})
         
-        
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
             st.markdown(response["answer"])
         # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+        st.session_state.messages.append({"role": "assistant", "content": response["context"]})
+
+  
+if (uploaded_files):
+    uploaded()
+if prompt:
+    prompted()
+    uploaded()
