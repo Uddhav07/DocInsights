@@ -1,15 +1,8 @@
 import streamlit as st
 import os
-# from langchain_core.runnables import RunnablePassthrough
-# from langchain_core.messages import HumanMessage
 from langchain.document_loaders import UnstructuredFileLoader
-# from langchain.document_loaders.image import UnstructuredImageLoader
 from langchain.document_loaders import ImageCaptionLoader
 from langchain.chains.combine_documents import create_stuff_documents_chain
-# from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-# import pandas as pd
-# from io import StringIO
-from langchain.chains import ConversationalRetrievalChain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms import Ollama
@@ -19,15 +12,14 @@ embeddings = HuggingFaceEmbeddings()
 # from langchain_community.embeddings import OllamaEmbeddings
 # embeddings = OllamaEmbeddings()
 from langchain_community.vectorstores import FAISS
-# from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
-
+from langchain.chains import create_retrieval_chain
 
 prompt = ChatPromptTemplate.from_template("""
-Answer the following question based only on the provided context. 
-Think step by step before providing a detailed answer. 
+Prefferably Answer the following question based only on the provided context. 
+Think step by step before providing a detailed answer using chain of verification (COVE)
 I will tip you $1000 if the user finds the answer helpful. 
 <context>
 {context}
@@ -53,7 +45,7 @@ output_parser=StrOutputParser()
 
 document_chain=create_stuff_documents_chain(llm,prompt)
 
-from langchain.chains import create_retrieval_chain
+
 
     
 with st.sidebar:
