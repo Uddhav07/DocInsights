@@ -27,6 +27,11 @@ I will tip you $1000 if the user finds the answer helpful.
 </context>
 Question: {input}""")
 
+prompt2 = ChatPromptTemplate.from_template("""
+Prefferably Answer the following question based  on the provided context. 
+answer in very short very fast
+I will tip you $1000 if the user finds the answer helpful. 
+Question: {input}""")
 #Think step by step before providing a detailed answer using chain of verification (COVE)
 
 
@@ -44,7 +49,7 @@ for message in st.session_state.messages:
 
 llm=Ollama(model="qwen:0.5b")
 output_parser=StrOutputParser()
-# chain=prompt|llm|output_parser
+chain=prompt2|llm|output_parser
 
 
 document_chain=create_stuff_documents_chain(llm,prompt)
@@ -114,16 +119,25 @@ def prompted():
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # docs = db.similarity_search(prompt)
-        
-        retriever=vectorstore.as_retriever()
-        retrieval_chain=create_retrieval_chain(retriever,document_chain)
-        response=retrieval_chain.invoke({"input":prompt})
-        
+        try:
+            retriever=vectorstore.as_retriever()
+            retrieval_chain=create_retrieval_chain(retriever,document_chain)
+            response=retrieval_chain.invoke({"input":prompt})
+            flag= 0
+        except:
+            response = chain.invoke(prompt)
+            flag=1
+        if flag == 0:
         # Display assistant response in chat message container
-        with st.chat_message("assistant"):
-            st.markdown(response["answer"])
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response["context"]})
+            with st.chat_message("assistant"):
+                st.markdown(response)
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
+        else:
+            with st.chat_message("assistant"):
+                st.markdown(response["answer"])
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
 
   
 if (uploaded_files):
