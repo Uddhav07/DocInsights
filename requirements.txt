@@ -4,8 +4,8 @@ langchain_community
 langchain_core
 faiss-cpu
 pypdf2
-
-
-
-pip install "unstructured[pdf]"
-pip install unstructured
+sentence-transformers
+unstructured
+unstructured[pdf]
+unstructured[docx]
+opencv-python-headless
