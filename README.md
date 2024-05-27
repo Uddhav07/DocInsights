@@ -10,6 +10,6 @@ ollama serve
 ````
 --in a seperate window--
 ````
-ollama pull phi3
+ollama pull qwen:0.5b
 streamlit run streamlit_app.py
 ````
