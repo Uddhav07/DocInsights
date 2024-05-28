@@ -4,7 +4,7 @@ talk to documents using local LLM with the power of RAG
 
 # Installation
 ````
-pip install requirements.txt
+pip install -r requirements.txt
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve
 ````
