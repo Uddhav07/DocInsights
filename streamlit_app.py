@@ -18,7 +18,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 
 prompt = ChatPromptTemplate.from_template("""
-Prefferably Answer the following question based  on the provided context. 
+Answer the following question based only on the provided context. 
 Only If much reference is not available in the context then start the answer with [NotDoc] and answer on your own
 answer in very short very fast
 I will tip you $1000 if the user finds the answer helpful. 
@@ -50,7 +50,6 @@ for message in st.session_state.messages:
 llm=Ollama(model="qwen:0.5b")
 output_parser=StrOutputParser()
 chain=prompt2|llm|output_parser
-
 
 document_chain=create_stuff_documents_chain(llm,prompt)
 
@@ -127,7 +126,7 @@ def prompted():
         except:
             response = chain.invoke(prompt)
             flag=1
-        if flag == 0:
+        if flag == 1:
         # Display assistant response in chat message container
             with st.chat_message("assistant"):
                 st.markdown(response)
@@ -135,9 +134,9 @@ def prompted():
             st.session_state.messages.append({"role": "assistant", "content": response})
         else:
             with st.chat_message("assistant"):
-                st.markdown(response["answer"])
+                st.markdown(response)
             # Add assistant response to chat history
-            st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
   
 if (uploaded_files):
