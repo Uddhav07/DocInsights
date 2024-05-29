@@ -1,1 +1,5 @@
 trials.py
+*.pdf
+recomendation.txt
+.chroma
+data
