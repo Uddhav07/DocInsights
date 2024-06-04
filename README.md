@@ -11,5 +11,6 @@ ollama serve
 --in a seperate window--
 ````
 ollama pull qwen:0.5b
+ollama pull gemma:2b
 streamlit run streamlit_app.py
 ````

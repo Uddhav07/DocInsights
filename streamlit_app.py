@@ -1,5 +1,9 @@
 import streamlit as st
 import os
+from langchain_community.vectorstores import DocArrayInMemorySearch
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.document_loaders import ImageCaptionLoader
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -18,21 +22,30 @@ text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 
-prompt = ChatPromptTemplate.from_template("""
-Prefferably Answer the following question based  on the provided context. 
-Only If much reference is not available in the context then start the answer with [NotDoc] and answer on your own
+prompt1 = ChatPromptTemplate.from_template("""
+Answer the following question based only on the provided context. 
 answer in very short very fast
 I will tip you $1000 if the user finds the answer helpful. 
 <context>
 {context}
 </context>
-Question: {input}""")
+Question: {question}""")
+
+PROMPT_TEMPLATE = """
+Answer the question based only on the following context:
+
+{context}
+
+---
+
+Answer the question based on the above context: {question}
+"""
 
 prompt2 = ChatPromptTemplate.from_template("""
 Prefferably Answer the following question based  on the provided context. 
 answer in very short very fast
 I will tip you $1000 if the user finds the answer helpful. 
-Question: {input}""")
+Question: {question}""")
 #Think step by step before providing a detailed answer using chain of verification (COVE)
 
 st.title("DocInsight")
@@ -46,36 +59,37 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-models = ("qwen:0.5b","tinyllama")
+models = ("gemma:2b","qwen:0.5b")
 vstores = ("FAISS","Chroma")
 
 if "model_selected" not in st.session_state:
     st.session_state.model_selected = "qwen:0.5b"
 if "store_selected" not in st.session_state:
-    st.session_state.store_selected = "FAISS"
+    st.session_state.store_selected = "gemma:2b"
 
-def chain_maker():
-    model_selected = st.session_state.model_selected
-    global chain,document_chain
-    llm=Ollama(model=model_selected)
-    output_parser=StrOutputParser()
-    chain=prompt2|llm|output_parser
-    document_chain=create_stuff_documents_chain(llm,prompt)
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+output_parser=StrOutputParser()
+model_selected = st.session_state.model_selected
+llm=Ollama(model=model_selected)
+# chain=prompt2|llm|output_parser
+# document_chain=create_stuff_documents_chain(llm,prompt) 
 
-chain_maker()
 prompt = st.chat_input("Yooo wassup?")
 
-def vstore(document_chunks):
-    store_selected = st.session_state.store_selected
-    if store_selected == "FAISS":
-        vectorstore = FAISS.from_documents(document_chunks, embeddings)
-    if store_selected == "Chroma":
-        vectorstore = Chroma.from_documents(document_chunks, embeddings)
-    # Store the processed data in session state for reuse
-    st.session_state.processed_data = {
-        "document_chunks": document_chunks,
-        "vectorstore": vectorstore,
-    }
+def vstore():
+    if uploaded_files:
+        document_chunks = st.session_state.document_chunks 
+        store_selected = st.session_state.store_selected
+        if store_selected == "FAISS":
+            vectorstore = FAISS.from_documents(document_chunks, embeddings)
+        if store_selected == "Chroma":
+            vectorstore = Chroma.from_documents(document_chunks, embeddings)
+        # Store the processed data in session state for reuse
+        st.session_state.processed_data = {
+            "document_chunks": document_chunks,
+            "vectorstore": vectorstore,
+        }
 
 def uploaded():
     global document_chunks
@@ -120,31 +134,42 @@ def uploaded():
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
         document_chunks = text_splitter.split_documents(documents)
 
-        vstore(document_chunks)
+        st.session_state.document_chunks = document_chunks
+        
+        vstore()
       
 def prompted():        
     if prompt:
-        vectorstore = st.session_state.processed_data["vectorstore"]
         # Display user message in chat message container
         st.chat_message("user").markdown(prompt)
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # docs = db.similarity_search(prompt)
-        try:
-            retriever=vectorstore.as_retriever()
-            retrieval_chain=create_retrieval_chain(retriever,document_chain)
-            response=retrieval_chain.invoke({"input":prompt})
-            flag= 0
-        except:
-            response = chain.invoke(prompt)
-            flag=1
+        # try:
+        
+        vectorstore = st.session_state.processed_data["vectorstore"]
+        results = vectorstore.similarity_search_with_score(prompt, k=5)
+        context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+        prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+        prompted = prompt_template.format(context=context_text, question=prompt)
+        response = llm.invoke(prompted)
+        
+        # document_chain = retriever | prompt1 | llm | output_parser
+        # retrieval_chain=create_retrieval_chain(retriever,document_chain)
+        # document_chain=create_stuff_documents_chain(llm,prompt1)
+        # retrieval_chain=create_retrieval_chain(retriever,document_chain)
+        # response=rag_chain.invoke(prompt)
+        flag= 0
+        # except:
+            # response = chain.invoke(prompt)
+            # flag=1
         if flag == 1:
         # Display assistant response in chat message container
             with st.chat_message("assistant"):
-                st.markdown(response)
-            # Add assistant response to chat history
-            st.session_state.messages.append({"role": "assistant", "content": response})
+                st.markdown("idk")
+            # Add assistant "idk" to chat history
+            st.session_state.messages.append({"role": "assistant", "content": "idk"})
         else:
             with st.chat_message("assistant"):
                 st.markdown(response)
@@ -154,13 +179,7 @@ def prompted():
 with st.sidebar:
     uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
     st.button("index files", on_click=uploaded)
-    model_selected = st.selectbox("Select Model",models)
-    store_selected = st.selectbox("select store", vstores)
-    if model_selected != st.session_state.model_selected:
-        st.session_state.model_selected = model_selected
-        chain_maker()
-    if store_selected != st.session_state.store_selected:
-        st.session_state.store_selected = store_selected
-        vstore(document_chunks)
+    st.selectbox("Select Model",("gemma:2b","qwen:0.5b"),key="model_selected")
+    st.selectbox("select store", vstores,key="store_selected")
 if prompt:
     prompted()
