@@ -21,7 +21,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-
+import ollama
 
 
 PROMPT_TEMPLATE = """
@@ -34,13 +34,6 @@ Answer the question based only on the following context:
 Answer the question based on the above context: {question}
 """
 
-prompt2 = ChatPromptTemplate.from_template("""
-Prefferably Answer the following question based  on the provided context. 
-answer in very short very fast
-I will tip you $1000 if the user finds the answer helpful. 
-Question: {question}""")
-#Think step by step before providing a detailed answer using chain of verification (COVE)
-
 st.title("DocInsight")
 
 # Initialize chat history
@@ -52,23 +45,33 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-models = ("gemma:2b","qwen:0.5b")
+
+
+models = [model["name"] for model in ollama.list()["models"]]
 vstores = ("FAISS","Chroma")
 
 if "model_selected" not in st.session_state:
-    st.session_state.model_selected = "qwen:0.5b"
+    st.session_state.model_selected = models[0]
 if "store_selected" not in st.session_state:
-    st.session_state.store_selected = "gemma:2b"
+    st.session_state.store_selected = vstores[0]
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 output_parser=StrOutputParser()
-model_selected = st.session_state.model_selected
-llm=Ollama(model=model_selected)
-# chain=prompt2|llm|output_parser
-# document_chain=create_stuff_documents_chain(llm,prompt) 
+# model_selected = st.session_state["model_selected"]
+# llm=Ollama(model=model_selected)
 
 prompt = st.chat_input("Yooo wassup?")
+
+
+def model_res_generator():
+    stream = ollama.chat(
+        model=st.session_state["model_selected"],
+        messages=st.session_state["messages"],
+        stream=True,
+    )
+    for chunk in stream:
+        yield chunk["message"]["content"]
 
 def vstore():
     if uploaded_files:
@@ -130,33 +133,27 @@ def uploaded():
         st.session_state.document_chunks = document_chunks
         
         vstore()
-      
-def prompted():        
-    if prompt:
-        
-        st.chat_message("user").markdown(prompt)
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-
-        # docs = db.similarity_search(prompt)
-        # try:
-        
-        vectorstore = st.session_state.processed_data["vectorstore"]
-        results = vectorstore.similarity_search_with_score(prompt, k=5)
-        context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
-        prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-        prompted = prompt_template.format(context=context_text, question=prompt)
-        response = llm.invoke(prompted)
-
-        with st.chat_message("assistant"):
-            st.markdown(response)
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
 
 with st.sidebar:
     uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
     st.button("index files", on_click=uploaded)
     st.selectbox("Select Model",("gemma:2b","qwen:0.5b"),key="model_selected")
     st.selectbox("select store", vstores,key="store_selected")
+
 if prompt:
-    prompted()
+    
+    st.chat_message("user").markdown(prompt)
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    vectorstore = st.session_state.processed_data["vectorstore"]
+    results = vectorstore.similarity_search_with_score(prompt, k=5)
+    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+    prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+    prompted = prompt_template.format(context=context_text, question=prompt)
+    # response = llm.invoke(prompted)
+
+    with st.chat_message("assistant"):
+        response = st.write_stream(model_res_generator())
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
