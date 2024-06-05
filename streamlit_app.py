@@ -23,7 +23,6 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 import ollama
 
-
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
 
@@ -34,16 +33,9 @@ Answer the question based only on the following context:
 Answer the question based on the above context: {question}
 """
 
-prompt2 = ChatPromptTemplate.from_template("""
-Prefferably Answer the following question based  on the provided context. 
-answer in very short very fast
-I will tip you $1000 if the user finds the answer helpful. 
-Question: {question}""")
-#Think step by step before providing a detailed answer using chain of verification (COVE)
-
 st.title("DocInsight")
 
-# Initialize chat history
+# chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -60,13 +52,9 @@ if "model_selected" not in st.session_state:
 if "store_selected" not in st.session_state:
     st.session_state.store_selected = vstores[0]
 
-def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
 output_parser=StrOutputParser()
 model_selected = st.session_state.model_selected
 llm=Ollama(model=model_selected)
-# chain=prompt2|llm|output_parser
-# document_chain=create_stuff_documents_chain(llm,prompt) 
 
 prompt = st.chat_input("Yooo wassup?")
 
@@ -131,32 +119,33 @@ def uploaded():
         
         vstore()
       
-def prompted():        
-    if prompt:
-        
-        st.chat_message("user").markdown(prompt)
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # docs = db.similarity_search(prompt)
-        # try:
-        
+with st.sidebar:
+    uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
+    st.button("index files", on_click=uploaded)
+    st.selectbox("Select Model", models , key="model_selected")
+    st.selectbox("select store", vstores, key="store_selected")
+
+
+if prompt:
+    # user message
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    if  ("processed_data" in st.session_state):
         vectorstore = st.session_state.processed_data["vectorstore"]
         results = vectorstore.similarity_search_with_score(prompt, k=5)
         context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
         prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
         prompted = prompt_template.format(context=context_text, question=prompt)
-        # response = llm.invoke(prompted)
 
         with st.chat_message("assistant"):
             response=st.write_stream(llm.stream(prompted))
-            # Add assistant response to chat history
+            # chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
+    else:
+        with st.chat_message("assistant"):
+            response=st.write("Please Upload and Index a file first")
+            # chat history
+            st.session_state.messages.append({"role": "assistant", "content": "Please Upload and Index a file first"})
 
-with st.sidebar:
-    uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
-    st.button("index files", on_click=uploaded)
-    st.selectbox("Select Model",models,key="model_selected")
-    st.selectbox("select store", vstores,key="store_selected")
-if prompt:
-    prompted()
+    
