@@ -66,16 +66,14 @@ def vstore():
             vectorstore = FAISS.from_documents(document_chunks, embeddings)
         if store_selected == "Chroma":
             vectorstore = Chroma.from_documents(document_chunks, embeddings)
-        # Store the processed data in session state for reuse
+        # Store processed data in session state
         st.session_state.processed_data = {
             "document_chunks": document_chunks,
             "vectorstore": vectorstore,
         }
 
 def uploaded():
-    global document_chunks
     if uploaded_files:
-        global vectorstore
         # Print the number of files uploaded or YouTube URL provided to the console
         st.write(f"Number of files uploaded: {len(uploaded_files)}")
             # Load the data and perform preprocessing only if it hasn't been loaded before
