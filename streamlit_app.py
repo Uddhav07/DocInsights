@@ -21,7 +21,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-
+import ollama
 
 
 PROMPT_TEMPLATE = """
@@ -52,13 +52,13 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-models = ("gemma:2b","qwen:0.5b")
+models = [model["name"] for model in ollama.list()["models"]]
 vstores = ("FAISS","Chroma")
 
 if "model_selected" not in st.session_state:
-    st.session_state.model_selected = "qwen:0.5b"
+    st.session_state.model_selected = models[0]
 if "store_selected" not in st.session_state:
-    st.session_state.store_selected = "gemma:2b"
+    st.session_state.store_selected = vstores[0]
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -156,7 +156,7 @@ def prompted():
 with st.sidebar:
     uploaded_files = st.file_uploader("Please upload your files", accept_multiple_files=True, type=None)
     st.button("index files", on_click=uploaded)
-    st.selectbox("Select Model",("gemma:2b","qwen:0.5b"),key="model_selected")
+    st.selectbox("Select Model",models,key="model_selected")
     st.selectbox("select store", vstores,key="store_selected")
 if prompt:
     prompted()
