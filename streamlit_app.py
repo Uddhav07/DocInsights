@@ -22,14 +22,7 @@ text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 
-prompt1 = ChatPromptTemplate.from_template("""
-Answer the following question based only on the provided context. 
-answer in very short very fast
-I will tip you $1000 if the user finds the answer helpful. 
-<context>
-{context}
-</context>
-Question: {question}""")
+
 
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
@@ -140,7 +133,7 @@ def uploaded():
       
 def prompted():        
     if prompt:
-        # Display user message in chat message container
+        
         st.chat_message("user").markdown(prompt)
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
