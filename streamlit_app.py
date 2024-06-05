@@ -22,6 +22,8 @@ text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=50)
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 import ollama
+from langchain_community.document_loaders import UnstructuredXMLLoader
+from langchain_community.document_loaders.csv_loader import CSVLoader
 
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
@@ -104,6 +106,20 @@ def uploaded():
             elif file_path.endswith((".pdf", ".docx", ".txt")):
                 # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
                 loader = UnstructuredFileLoader(file_path)
+                loaded_documents = loader.load()
+
+                # Extend the main documents list with the loaded documents
+                documents.extend(loaded_documents)
+            elif file_path.endswith((".xml")):
+                # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
+                loader = UnstructuredXMLLoader(file_path)
+                loaded_documents = loader.load()
+
+                # Extend the main documents list with the loaded documents
+                documents.extend(loaded_documents)
+            elif file_path.endswith((".csv")):
+                # Use UnstructuredFileLoader to load the PDF/DOCX/TXT file
+                loader = CSVLoader(file_path)
                 loaded_documents = loader.load()
 
                 # Extend the main documents list with the loaded documents
