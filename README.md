@@ -10,7 +10,7 @@ ollama serve
 ````
 --in a seperate window--
 ````
-ollama pull qwen:0.5b
+ollama pull qwen2:0.5b
 ollama pull gemma:2b
 python -m streamlit run streamlit_app.py
 ````
