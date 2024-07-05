@@ -14,3 +14,9 @@ ollama pull qwen2:0.5b
 ollama pull gemma:2b
 python -m streamlit run streamlit_app.py
 ````
+Preview
+
+
+
+https://github.com/Uddhav07/DocInsights/assets/93899908/b2baecf5-8328-4418-ac9f-b74fc1efab73
+
