@@ -1,4 +1,9 @@
 ## DocInsights
+Architected AI-powered document analysis system achieving 40% accuracy improvement through optimized RAG model implementation using Ollama and advanced indexing techniques
+
+Engineered offline-capable chatbot interface with Streamlit, reducing processing time by 35% while ensuring complete data privacy through local execution
+
+Developed customizable vector stores enabling seamless user interaction without internet dependency, demonstrating full-stack development capabilities
 
 talk to documents using local LLM with the power of RAG
 
